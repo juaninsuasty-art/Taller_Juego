@@ -71,7 +71,10 @@ ball_dy = -4.0
 # =========================
 # Estado del juego
 # =========================
-estado = "menu"   # menu | controles | configuracion | ready | playing
+estado = "menu"   # menu | controles | configuracion | ready | playing | game_over
+
+# TJ-26 vidas iniciales
+vidas = 3
 
 # =========================
 # Botones
@@ -82,6 +85,7 @@ btn_settings = pygame.Rect(W // 2 - 95, 324, 190, 40)
 btn_quit = pygame.Rect(W // 2 - 95, 376, 190, 40)
 
 btn_exit_sub = pygame.Rect(W // 2 - 80, 388, 160, 36)
+btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
 
 # =========================
 # Ladrillos
@@ -121,16 +125,26 @@ def crear_ladrillos():
 
 def reset_ball():
     global ball_x, ball_y, ball_dx, ball_dy
+
     ball_x = float(pad_x)
     ball_y = float(PAD_Y - BALL_R - 2)
     ball_dx = 4.0
     ball_dy = -4.0
 
 
+# TJ-26 reiniciar partida completa
+def reiniciar_partida():
+    global vidas, ladrillos, estado
+
+    vidas = 3
+    ladrillos = crear_ladrillos()
+    reset_ball()
+    estado = "ready"
+
+
 def draw_pattern_background():
     screen.fill(BG)
 
-    # puntos y pequeñas lineas diagonales en cian
     for y in range(0, H, 22):
         for x in range(0, W, 26):
             px = x + ((y // 22) % 2) * 10
@@ -149,6 +163,7 @@ def draw_pattern_background():
 
 def draw_text_outline(texto, fuente, color_texto, color_borde, x, y):
     offsets = [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, -2), (-2, 2), (2, 2)]
+
     for dx, dy in offsets:
         borde = fuente.render(texto, True, color_borde)
         screen.blit(borde, (x + dx, y + dy))
@@ -163,16 +178,13 @@ def dibujar_logo():
     gx = W // 2 - glow.get_width() // 2
     gy = 76
 
-    # capa glow
     screen.blit(glow, (gx - 2, gy))
     screen.blit(glow, (gx + 2, gy))
     screen.blit(glow, (gx, gy - 2))
     screen.blit(glow, (gx, gy + 2))
 
-    # capa principal con borde
     draw_text_outline(texto, font_title, TITLE_MAIN, TITLE_OUTLINE, gx, gy)
 
-    # linea decorativa
     pygame.draw.line(screen, CYAN_BRIGHT, (145, 125), (375, 125), 2)
     pygame.draw.line(screen, CYAN_SOFT, (165, 132), (355, 132), 1)
 
@@ -189,7 +201,6 @@ def dibujar_boton(rect, texto):
     pygame.draw.rect(screen, color, rect, border_radius=10)
     pygame.draw.rect(screen, BUTTON_BORDER, rect, width=2, border_radius=10)
 
-    # brillo superior suave
     pygame.draw.line(
         screen,
         (220, 250, 255),
@@ -280,6 +291,23 @@ def dibujar_configuracion():
     dibujar_boton(btn_exit_sub, "EXIT")
 
 
+# TJ-26 pantalla de Game Over
+def dibujar_game_over():
+    draw_pattern_background()
+    dibujar_panel(70, 70, 380, 330)
+
+    titulo = font_title.render("GAME OVER", True, TITLE_MAIN)
+    screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 120))
+
+    texto = font_med.render("Te quedaste sin vidas", True, TEXT_COL)
+    screen.blit(texto, (W // 2 - texto.get_width() // 2, 190))
+
+    ayuda = font_small.render("Puedes volver al menu principal.", True, SUBTEXT_COL)
+    screen.blit(ayuda, (W // 2 - ayuda.get_width() // 2, 225))
+
+    dibujar_boton(btn_back_menu, "VOLVER AL MENU")
+
+
 def dibujar_mensaje_ready():
     txt = font_med.render("Presiona ESPACIO para lanzar", True, TEXT_COL)
     screen.blit(txt, (W // 2 - txt.get_width() // 2, H // 2 + 105))
@@ -307,9 +335,7 @@ while True:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if estado == "menu":
                 if btn_start.collidepoint(event.pos):
-                    ladrillos = crear_ladrillos()
-                    reset_ball()
-                    estado = "ready"
+                    reiniciar_partida()
 
                 elif btn_controls.collidepoint(event.pos):
                     estado = "controles"
@@ -327,6 +353,10 @@ while True:
 
             elif estado == "configuracion":
                 if btn_exit_sub.collidepoint(event.pos):
+                    estado = "menu"
+
+            elif estado == "game_over":
+                if btn_back_menu.collidepoint(event.pos):
                     estado = "menu"
 
         # =========================
@@ -351,6 +381,11 @@ while True:
 
     if estado == "configuracion":
         dibujar_configuracion()
+        pygame.display.flip()
+        continue
+
+    if estado == "game_over":
+        dibujar_game_over()
         pygame.display.flip()
         continue
 
@@ -415,10 +450,15 @@ while True:
                 ball_dy = -ball_dy
                 break
 
-        # Si cae, vuelve a ready
+        # TJ-26: si cae la pelota, se resta una vida
         if ball_y - BALL_R > H:
-            reset_ball()
-            estado = "ready"
+            vidas -= 1
+
+            if vidas <= 0:
+                estado = "game_over"
+            else:
+                reset_ball()
+                estado = "ready"
 
     # =========================
     # Dibujo del juego
