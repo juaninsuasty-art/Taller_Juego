@@ -1,7 +1,61 @@
 import pygame
 import sys
+import math
+import array
 
 pygame.init()
+
+# =========================
+# Sonido - TJ-31
+# =========================
+try:
+    pygame.mixer.init(frequency=44100, size=-16, channels=1)
+    SOUND_ENABLED = True
+except pygame.error:
+    SOUND_ENABLED = False
+
+
+def crear_sonido(frecuencia, duracion, volumen=0.35):
+    """
+    TJ-31:
+    Crea un sonido simple sin usar archivos externos.
+    """
+    sample_rate = 44100
+    muestras = array.array("h")
+    total_muestras = int(sample_rate * duracion)
+
+    for i in range(total_muestras):
+        t = i / sample_rate
+        fade = 1 - (i / total_muestras)
+        valor = int(
+            volumen
+            * 32767
+            * fade
+            * math.sin(2 * math.pi * frecuencia * t)
+        )
+        muestras.append(valor)
+
+    return pygame.mixer.Sound(buffer=muestras.tobytes())
+
+
+def reproducir_sonido(sonido):
+    if SOUND_ENABLED and sonido is not None:
+        sonido.play()
+
+
+if SOUND_ENABLED:
+    SND_MENU = crear_sonido(520, 0.08, 0.25)
+    SND_PALETA = crear_sonido(720, 0.07, 0.30)
+    SND_LADRILLO = crear_sonido(420, 0.09, 0.35)
+    SND_VIDA = crear_sonido(180, 0.20, 0.35)
+    SND_GAME_OVER = crear_sonido(120, 0.35, 0.35)
+else:
+    SND_MENU = None
+    SND_PALETA = None
+    SND_LADRILLO = None
+    SND_VIDA = None
+    SND_GAME_OVER = None
+
 
 W, H = 520, 480
 screen = pygame.display.set_mode((W, H))
@@ -74,7 +128,7 @@ ball_dy = -4.0
 # =========================
 # Estado del juego
 # =========================
-estado = "menu"   # menu | controles | configuracion | ready | playing | life_lost | game_over
+estado = "menu"
 
 # =========================
 # Estado de partida
@@ -107,13 +161,6 @@ BRICK_OFF_Y = 55
 
 
 def crear_nivel_1():
-    """
-    TJ-33:
-    Crea un unico nivel estatico.
-
-    TJ-34:
-    Las dos primeras filas tienen mayor durabilidad.
-    """
     ladrillos_nivel = []
 
     for fila in range(BRICK_ROWS):
@@ -389,36 +436,45 @@ while True:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if estado == "menu":
                 if btn_start.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     reiniciar_partida()
 
                 elif btn_controls.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     estado = "controles"
 
                 elif btn_settings.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     estado = "configuracion"
 
                 elif btn_quit.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     pygame.quit()
                     sys.exit()
 
             elif estado == "controles":
                 if btn_exit_sub.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     estado = "menu"
 
             elif estado == "configuracion":
                 if btn_exit_sub.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     estado = "menu"
 
             elif estado == "game_over":
                 if btn_back_menu.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
                     estado = "menu"
 
         # Teclas
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and estado == "ready":
+                reproducir_sonido(SND_MENU)
                 estado = "playing"
 
             elif event.key == pygame.K_RETURN and estado == "life_lost":
+                reproducir_sonido(SND_MENU)
                 reset_ball()
                 estado = "ready"
 
@@ -461,7 +517,6 @@ while True:
 
     # Estado PLAYING
     if estado == "playing":
-        # TJ-24: guardar posición anterior de la pelota
         prev_ball_x = ball_x
         prev_ball_y = ball_y
 
@@ -487,6 +542,7 @@ while True:
             and pad_x - PAD_W // 2 <= ball_x <= pad_x + PAD_W // 2
             and ball_dy > 0
         ):
+            reproducir_sonido(SND_PALETA)
             rel = (ball_x - pad_x) / (PAD_W / 2)
             ball_dx = rel * 5
             ball_dy = -abs(ball_dy)
@@ -505,6 +561,8 @@ while True:
                 continue
 
             if ball_rect.colliderect(ladrillo["rect"]):
+                reproducir_sonido(SND_LADRILLO)
+
                 ladrillo["vida"] -= 1
 
                 if ladrillo["vida"] <= 0:
@@ -526,13 +584,15 @@ while True:
 
                 break
 
-        # TJ-27: si cae la pelota, se resta una vida y se muestra aviso leve
+        # Si cae la pelota
         if ball_y - BALL_R > H:
             vidas -= 1
 
             if vidas <= 0:
+                reproducir_sonido(SND_GAME_OVER)
                 estado = "game_over"
             else:
+                reproducir_sonido(SND_VIDA)
                 estado = "life_lost"
 
     # Dibujo del juego
