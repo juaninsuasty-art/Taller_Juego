@@ -2,6 +2,7 @@ import pygame
 import sys
 import math
 import array
+import random
 
 pygame.init()
 
@@ -46,6 +47,7 @@ if SOUND_ENABLED:
     SND_VIDA = crear_sonido(180, 0.20, 0.35)
     SND_GAME_OVER = crear_sonido(120, 0.35, 0.35)
     SND_WIN = crear_sonido(880, 0.25, 0.30)
+    SND_POWER = crear_sonido(980, 0.15, 0.35)
 else:
     SND_MENU = None
     SND_PALETA = None
@@ -53,6 +55,7 @@ else:
     SND_VIDA = None
     SND_GAME_OVER = None
     SND_WIN = None
+    SND_POWER = None
 
 
 W, H = 520, 480
@@ -90,6 +93,9 @@ HEART_COL = (255, 90, 120)
 WARNING_COL = (255, 210, 120)
 WIN_COL = (120, 255, 220)
 
+POWER_WIDE_COL = (120, 255, 180)
+POWER_BIG_COL = (255, 220, 120)
+
 BRICK_COLORS = [
     (90, 220, 220),
     (80, 180, 230),
@@ -111,24 +117,37 @@ font_small = pygame.font.SysFont("Consolas", 15)
 # =========================
 # Paleta
 # =========================
-PAD_W, PAD_H = 80, 10
+PAD_W_NORMAL = 80
+PAD_W_BIG = 120
+PAD_W = PAD_W_NORMAL
+PAD_H = 10
 PAD_Y = H - 40
 pad_x = W // 2
 
 # =========================
 # Pelota
 # =========================
-BALL_R = 7
+BALL_R_NORMAL = 7
+BALL_R_BIG = 11
+BALL_R = BALL_R_NORMAL
 ball_x = float(W // 2)
 ball_y = float(PAD_Y - BALL_R - 2)
 ball_dx = 4.0
 ball_dy = -4.0
 
 # =========================
+# Power-ups - TJ-37
+# =========================
+powerups = []
+powerup_speed = 2.2
+powerup_timer = 0
+active_powerup = None
+POWERUP_DURATION = 600  # frames aproximados a 60 FPS = 10 segundos
+
+# =========================
 # Estado del juego
 # =========================
 estado = "menu"
-# menu | controles | configuracion | ready | playing | life_lost | game_over | felicitaciones
 
 # =========================
 # Estado de partida
@@ -148,7 +167,6 @@ btn_quit = pygame.Rect(W // 2 - 95, 376, 190, 40)
 btn_exit_sub = pygame.Rect(W // 2 - 80, 388, 160, 36)
 btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
 
-# TJ-36: botones de la pantalla de felicitaciones
 btn_next_level = pygame.Rect(W // 2 - 105, 305, 210, 40)
 btn_win_menu = pygame.Rect(W // 2 - 105, 355, 210, 40)
 
@@ -168,16 +186,6 @@ BRICK_OFF_Y = 55
 # Niveles - TJ-33, TJ-34, TJ-36
 # =========================
 def crear_nivel(nivel_actual):
-    """
-    TJ-33:
-    Crea el nivel con una distribucion fija de ladrillos.
-
-    TJ-34:
-    Los ladrillos tienen diferente durabilidad.
-
-    TJ-36:
-    En niveles superiores aumenta la cantidad de ladrillos resistentes.
-    """
     ladrillos_nivel = []
 
     filas_resistentes = min(BRICK_ROWS, 1 + nivel_actual)
@@ -225,11 +233,17 @@ def oscurecer_color(color):
 
 
 def velocidad_por_nivel():
-    """
-    TJ-36:
-    Aumenta ligeramente la velocidad de la pelota segun el nivel.
-    """
     return 4.0 + (nivel - 1) * 0.4
+
+
+def reset_powerups():
+    global powerups, active_powerup, powerup_timer, PAD_W, BALL_R
+
+    powerups = []
+    active_powerup = None
+    powerup_timer = 0
+    PAD_W = PAD_W_NORMAL
+    BALL_R = BALL_R_NORMAL
 
 
 def reset_ball():
@@ -249,27 +263,133 @@ def reiniciar_partida():
     vidas = 3
     score = 0
     nivel = 1
+    reset_powerups()
     ladrillos = crear_nivel(nivel)
     reset_ball()
     estado = "ready"
 
 
-# TJ-36 pasar al siguiente nivel
 def pasar_siguiente_nivel():
     global nivel, ladrillos, estado
 
     nivel += 1
+    reset_powerups()
     ladrillos = crear_nivel(nivel)
     reset_ball()
     estado = "ready"
 
 
-# TJ-35 revisar si todos los ladrillos fueron destruidos
 def nivel_completado():
     for ladrillo in ladrillos:
         if ladrillo["activo"]:
             return False
     return True
+
+
+# =========================
+# Power-ups - TJ-37
+# =========================
+def crear_powerup(x, y):
+    tipo = random.choice(["WIDE", "BIG"])
+
+    rect = pygame.Rect(int(x) - 14, int(y) - 8, 28, 16)
+
+    if tipo == "WIDE":
+        color = POWER_WIDE_COL
+    else:
+        color = POWER_BIG_COL
+
+    powerups.append({
+        "rect": rect,
+        "tipo": tipo,
+        "color": color
+    })
+
+
+def intentar_lanzar_powerup(x, y):
+    """
+    TJ-37:
+    No todos los ladrillos sueltan mejora.
+    Se usa una probabilidad pequeña para que no aparezcan demasiadas.
+    """
+    if random.random() < 0.25:
+        crear_powerup(x, y)
+
+
+def aplicar_powerup(tipo):
+    global PAD_W, BALL_R, active_powerup, powerup_timer
+
+    reproducir_sonido(SND_POWER)
+
+    active_powerup = tipo
+    powerup_timer = POWERUP_DURATION
+
+    if tipo == "WIDE":
+        PAD_W = PAD_W_BIG
+        BALL_R = BALL_R_NORMAL
+
+    elif tipo == "BIG":
+        BALL_R = BALL_R_BIG
+        PAD_W = PAD_W_NORMAL
+
+
+def actualizar_powerups():
+    global powerup_timer, active_powerup, PAD_W, BALL_R
+
+    # Mover power-ups que caen
+    for powerup in powerups[:]:
+        powerup["rect"].y += powerup_speed
+
+        pad_rect = pygame.Rect(
+            int(pad_x - PAD_W // 2),
+            PAD_Y,
+            PAD_W,
+            PAD_H
+        )
+
+        if powerup["rect"].colliderect(pad_rect):
+            aplicar_powerup(powerup["tipo"])
+            powerups.remove(powerup)
+
+        elif powerup["rect"].top > H:
+            powerups.remove(powerup)
+
+    # Controlar duración de power-up activo
+    if active_powerup is not None:
+        powerup_timer -= 1
+
+        if powerup_timer <= 0:
+            active_powerup = None
+            powerup_timer = 0
+            PAD_W = PAD_W_NORMAL
+            BALL_R = BALL_R_NORMAL
+
+
+def dibujar_powerups():
+    for powerup in powerups:
+        pygame.draw.rect(
+            screen,
+            powerup["color"],
+            powerup["rect"],
+            border_radius=5
+        )
+
+        pygame.draw.rect(
+            screen,
+            (255, 255, 255),
+            powerup["rect"],
+            width=1,
+            border_radius=5
+        )
+
+        label = font_small.render(powerup["tipo"], True, (10, 10, 20))
+        screen.blit(
+            label,
+            (
+                powerup["rect"].centerx - label.get_width() // 2,
+                powerup["rect"].centery - label.get_height() // 2
+            )
+        )
 
 
 # =========================
@@ -393,9 +513,10 @@ def dibujar_controles():
         ("MOVER DERECHA", "Flecha derecha o B"),
         ("LANZAR PELOTA", "Barra espaciadora"),
         ("NAVEGAR MENU", "Click izquierdo"),
+        ("POWER-UPS", "Atrapa las mejoras que caen"),
     ]
 
-    y = 165
+    y = 145
     for accion, tecla in items:
         txt1 = font_med.render(accion, True, TEXT_COL)
         txt2 = font_small.render(tecla, True, SUBTEXT_COL)
@@ -404,7 +525,7 @@ def dibujar_controles():
         screen.blit(txt2, (95, y + 22))
 
         pygame.draw.line(screen, CYAN_DARK, (92, y + 46), (428, y + 46), 1)
-        y += 58
+        y += 48
 
     dibujar_boton(btn_exit_sub, "EXIT")
 
@@ -475,6 +596,10 @@ def dibujar_hud():
         TEXT_COL
     )
     screen.blit(hud, (W - hud.get_width() - 18, 16))
+
+    if active_powerup is not None:
+        texto = font_small.render(f"POWER: {active_powerup}", True, CYAN_BRIGHT)
+        screen.blit(texto, (W // 2 - texto.get_width() // 2, 16))
 
 
 def dibujar_aviso_vida_perdida():
@@ -604,6 +729,8 @@ while True:
         ball_y = float(PAD_Y - BALL_R - 2)
 
     if estado == "playing":
+        actualizar_powerups()
+
         prev_ball_x = ball_x
         prev_ball_y = ball_y
 
@@ -652,6 +779,12 @@ while True:
                 if ladrillo["vida"] <= 0:
                     ladrillo["activo"] = False
                     score += ladrillo["puntos"]
+
+                    # TJ-37: algunos ladrillos destruidos liberan power-up
+                    intentar_lanzar_powerup(
+                        ladrillo["rect"].centerx,
+                        ladrillo["rect"].centery
+                    )
                 else:
                     ladrillo["color"] = oscurecer_color(ladrillo["color"])
 
@@ -701,6 +834,8 @@ while True:
                     width=1,
                     border_radius=2
                 )
+
+    dibujar_powerups()
 
     pygame.draw.rect(
         screen,
