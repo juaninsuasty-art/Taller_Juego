@@ -34,6 +34,9 @@ TITLE_MAIN = (255, 255, 255)
 TITLE_GLOW = (70, 220, 235)
 TITLE_OUTLINE = (20, 90, 130)
 
+HEART_COL = (255, 90, 120)
+WARNING_COL = (255, 210, 120)
+
 BRICK_COLORS = [
     (90, 220, 220),
     (80, 180, 230),
@@ -71,9 +74,9 @@ ball_dy = -4.0
 # =========================
 # Estado del juego
 # =========================
-estado = "menu"   # menu | controles | configuracion | ready | playing | game_over
+estado = "menu"   # menu | controles | configuracion | ready | playing | life_lost | game_over
 
-# TJ-26 vidas iniciales
+# Vidas
 vidas = 3
 
 # =========================
@@ -132,7 +135,6 @@ def reset_ball():
     ball_dy = -4.0
 
 
-# TJ-26 reiniciar partida completa
 def reiniciar_partida():
     global vidas, ladrillos, estado
 
@@ -162,7 +164,10 @@ def draw_pattern_background():
 
 
 def draw_text_outline(texto, fuente, color_texto, color_borde, x, y):
-    offsets = [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, -2), (-2, 2), (2, 2)]
+    offsets = [
+        (-2, 0), (2, 0), (0, -2), (0, 2),
+        (-2, -2), (2, -2), (-2, 2), (2, 2)
+    ]
 
     for dx, dy in offsets:
         borde = fuente.render(texto, True, color_borde)
@@ -291,7 +296,6 @@ def dibujar_configuracion():
     dibujar_boton(btn_exit_sub, "EXIT")
 
 
-# TJ-26 pantalla de Game Over
 def dibujar_game_over():
     draw_pattern_background()
     dibujar_panel(70, 70, 380, 330)
@@ -306,6 +310,27 @@ def dibujar_game_over():
     screen.blit(ayuda, (W // 2 - ayuda.get_width() // 2, 225))
 
     dibujar_boton(btn_back_menu, "VOLVER AL MENU")
+
+
+# TJ-27 Corazones de vida
+def dibujar_vidas():
+    corazones = "♥ " * vidas
+    texto = font_med.render(corazones, True, HEART_COL)
+    screen.blit(texto, (18, 14))
+
+
+# TJ-27 Aviso leve al perder una vida
+def dibujar_aviso_vida_perdida():
+    caja = pygame.Rect(W // 2 - 150, H // 2 - 45, 300, 90)
+
+    pygame.draw.rect(screen, PANEL_COL, caja, border_radius=12)
+    pygame.draw.rect(screen, CYAN_BRIGHT, caja, width=2, border_radius=12)
+
+    aviso = font_med.render("VIDA PERDIDA", True, WARNING_COL)
+    ayuda = font_small.render("Presiona ENTER para continuar", True, SUBTEXT_COL)
+
+    screen.blit(aviso, (W // 2 - aviso.get_width() // 2, H // 2 - 25))
+    screen.blit(ayuda, (W // 2 - ayuda.get_width() // 2, H // 2 + 8))
 
 
 def dibujar_mensaje_ready():
@@ -360,11 +385,15 @@ while True:
                     estado = "menu"
 
         # =========================
-        # Lanzar pelota
+        # Teclas
         # =========================
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and estado == "ready":
                 estado = "playing"
+
+            elif event.key == pygame.K_RETURN and estado == "life_lost":
+                reset_ball()
+                estado = "ready"
 
     # =========================
     # Pantallas de menú
@@ -450,15 +479,14 @@ while True:
                 ball_dy = -ball_dy
                 break
 
-        # TJ-26: si cae la pelota, se resta una vida
+        # TJ-27: si cae la pelota, se resta una vida y se muestra aviso leve
         if ball_y - BALL_R > H:
             vidas -= 1
 
             if vidas <= 0:
                 estado = "game_over"
             else:
-                reset_ball()
-                estado = "ready"
+                estado = "life_lost"
 
     # =========================
     # Dibujo del juego
@@ -488,7 +516,13 @@ while True:
         BALL_R
     )
 
+    # Corazones de vida - TJ-27
+    dibujar_vidas()
+
     if estado == "ready":
         dibujar_mensaje_ready()
+
+    if estado == "life_lost":
+        dibujar_aviso_vida_perdida()
 
     pygame.display.flip()
