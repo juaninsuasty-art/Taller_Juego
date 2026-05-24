@@ -15,6 +15,8 @@ try:
 except pygame.error:
     SOUND_ENABLED = False
 
+sound_on = True
+
 
 def crear_sonido(frecuencia, duracion, volumen=0.35):
     sample_rate = 44100
@@ -36,7 +38,7 @@ def crear_sonido(frecuencia, duracion, volumen=0.35):
 
 
 def reproducir_sonido(sonido):
-    if SOUND_ENABLED and sonido is not None:
+    if SOUND_ENABLED and sound_on and sonido is not None:
         sonido.play()
 
 
@@ -168,6 +170,9 @@ btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
 btn_next_level = pygame.Rect(W // 2 - 105, 305, 210, 40)
 btn_win_menu = pygame.Rect(W // 2 - 105, 355, 210, 40)
 
+# Configuracion
+btn_sound = pygame.Rect(W // 2 - 105, 215, 210, 40)
+
 # =========================
 # Ladrillos
 # =========================
@@ -181,7 +186,7 @@ BRICK_OFF_Y = 55
 
 
 # =========================
-# Niveles - TJ-33, TJ-34, TJ-36
+# Niveles
 # =========================
 def crear_nivel(nivel_actual):
     ladrillos_nivel = []
@@ -190,6 +195,12 @@ def crear_nivel(nivel_actual):
 
     for fila in range(BRICK_ROWS):
         for columna in range(BRICK_COLS):
+
+            # División central en el nivel 1
+            if nivel_actual == 1 and columna == BRICK_COLS // 2:
+                continue
+
+            # En niveles superiores se deja el bloque completo
             rect = pygame.Rect(
                 BRICK_OFF_X + columna * (BRICK_W + BRICK_GAP),
                 BRICK_OFF_Y + fila * (BRICK_H + BRICK_GAP),
@@ -321,11 +332,6 @@ def intentar_lanzar_powerup(x, y):
 
 
 def agregar_multiples_pelotas():
-    """
-    TJ-37:
-    Power-up MULTI. Crea dos pelotas adicionales a partir
-    de la primera pelota disponible.
-    """
     if len(pelotas) == 0:
         return
 
@@ -576,11 +582,13 @@ def dibujar_configuracion():
 
     pygame.draw.line(screen, CYAN_BRIGHT, (120, 130), (400, 130), 2)
 
-    t1 = font_med.render("Seccion reservada para Version 2", True, TEXT_COL)
-    t2 = font_small.render("Aqui iran sonido y ajustes del juego.", True, SUBTEXT_COL)
+    estado_sonido = "ON" if sound_on else "OFF"
+    texto_sonido = f"SONIDO: {estado_sonido}"
 
-    screen.blit(t1, (W // 2 - t1.get_width() // 2, 205))
-    screen.blit(t2, (W // 2 - t2.get_width() // 2, 235))
+    info = font_small.render("Activa o silencia los efectos del juego.", True, SUBTEXT_COL)
+    screen.blit(info, (W // 2 - info.get_width() // 2, 165))
+
+    dibujar_boton(btn_sound, texto_sonido)
 
     dibujar_boton(btn_exit_sub, "EXIT")
 
@@ -703,7 +711,11 @@ while True:
                     estado = "menu"
 
             elif estado == "configuracion":
-                if btn_exit_sub.collidepoint(event.pos):
+                if btn_sound.collidepoint(event.pos):
+                    sound_on = not sound_on
+                    reproducir_sonido(SND_MENU)
+
+                elif btn_exit_sub.collidepoint(event.pos):
                     reproducir_sonido(SND_MENU)
                     estado = "menu"
 
