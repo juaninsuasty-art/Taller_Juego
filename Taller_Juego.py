@@ -95,7 +95,7 @@ btn_exit_sub = pygame.Rect(W // 2 - 80, 388, 160, 36)
 btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
 
 # =========================
-# Ladrillos - TJ-33 Nivel estatico
+# Ladrillos
 # =========================
 BRICK_COLS = 13
 BRICK_ROWS = 6
@@ -113,6 +113,11 @@ def crear_nivel_1():
     """
     TJ-33:
     Crea un unico nivel estatico con una distribucion fija de ladrillos.
+
+    TJ-34:
+    Agrega diferente durabilidad a los ladrillos.
+    Las dos primeras filas requieren 2 golpes.
+    Las demas filas requieren 1 golpe.
     """
     ladrillos_nivel = []
 
@@ -125,14 +130,35 @@ def crear_nivel_1():
                 BRICK_H
             )
 
+            if fila < 2:
+                vida_ladrillo = 2
+            else:
+                vida_ladrillo = 1
+
             ladrillos_nivel.append({
                 "rect": rect,
                 "color": BRICK_COLORS[fila],
+                "color_original": BRICK_COLORS[fila],
                 "activo": True,
+                "vida": vida_ladrillo,
+                "vida_max": vida_ladrillo,
                 "puntos": (BRICK_ROWS - fila) * 10
             })
 
     return ladrillos_nivel
+
+
+def oscurecer_color(color):
+    """
+    TJ-34:
+    Cuando un ladrillo resistente recibe un golpe pero no se destruye,
+    se oscurece un poco para mostrar que fue dañado.
+    """
+    return (
+        max(0, color[0] - 45),
+        max(0, color[1] - 45),
+        max(0, color[2] - 45)
+    )
 
 
 def reset_ball():
@@ -357,7 +383,7 @@ def dibujar_mensaje_ready():
 
 
 # =========================
-# Inicialización - TJ-33
+# Inicialización
 # =========================
 ladrillos = crear_nivel_1()
 
@@ -487,14 +513,20 @@ while True:
             ball_dy = -abs(ball_dy)
             ball_y = PAD_Y - BALL_R - 1
 
-        # Deteccion de colision pelota-ladrillo - TJ-23
+        # Deteccion de colision pelota-ladrillo - TJ-23 y TJ-34
         for ladrillo in ladrillos:
             if not ladrillo["activo"]:
                 continue
 
             if ladrillo["rect"].collidepoint(ball_x, ball_y):
-                ladrillo["activo"] = False
-                score += ladrillo["puntos"]
+                ladrillo["vida"] -= 1
+
+                if ladrillo["vida"] <= 0:
+                    ladrillo["activo"] = False
+                    score += ladrillo["puntos"]
+                else:
+                    ladrillo["color"] = oscurecer_color(ladrillo["color"])
+
                 ball_dy = -ball_dy
                 break
 
@@ -520,6 +552,16 @@ while True:
                 ladrillo["rect"],
                 border_radius=2
             )
+
+            # TJ-34: borde para identificar ladrillos resistentes
+            if ladrillo["vida_max"] > 1:
+                pygame.draw.rect(
+                    screen,
+                    (230, 245, 255),
+                    ladrillo["rect"],
+                    width=1,
+                    border_radius=2
+                )
 
     pygame.draw.rect(
         screen,
