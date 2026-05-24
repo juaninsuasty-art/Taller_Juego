@@ -16,10 +16,6 @@ except pygame.error:
 
 
 def crear_sonido(frecuencia, duracion, volumen=0.35):
-    """
-    TJ-31:
-    Crea un sonido simple sin usar archivos externos.
-    """
     sample_rate = 44100
     muestras = array.array("h")
     total_muestras = int(sample_rate * duracion)
@@ -223,6 +219,14 @@ def reiniciar_partida():
     estado = "ready"
 
 
+# TJ-35 Revisar si el nivel fue completado
+def nivel_completado():
+    for ladrillo in ladrillos:
+        if ladrillo["activo"]:
+            return False
+    return True
+
+
 def draw_pattern_background():
     screen.fill(BG)
 
@@ -372,7 +376,6 @@ def dibujar_configuracion():
     dibujar_boton(btn_exit_sub, "EXIT")
 
 
-# TJ-32 Pantalla Game Over
 def dibujar_game_over():
     draw_pattern_background()
     dibujar_panel(70, 70, 380, 330)
@@ -389,7 +392,6 @@ def dibujar_game_over():
     dibujar_boton(btn_back_menu, "VOLVER AL MENU")
 
 
-# TJ-32 Pantalla Felicitaciones
 def dibujar_felicitaciones():
     draw_pattern_background()
     dibujar_panel(60, 60, 400, 340)
@@ -399,7 +401,7 @@ def dibujar_felicitaciones():
 
     texto1 = font_med.render("Completaste el nivel", True, TEXT_COL)
     texto2 = font_med.render(f"Puntuacion: {score}", True, TEXT_COL)
-    texto3 = font_small.render("Puedes continuar con el siguiente nivel.", True, SUBTEXT_COL)
+    texto3 = font_small.render("Presiona continuar para jugar de nuevo.", True, SUBTEXT_COL)
 
     screen.blit(texto1, (W // 2 - texto1.get_width() // 2, 180))
     screen.blit(texto2, (W // 2 - texto2.get_width() // 2, 210))
@@ -457,7 +459,6 @@ while True:
             pygame.quit()
             sys.exit()
 
-        # Navegación de menús
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if estado == "menu":
                 if btn_start.collidepoint(event.pos):
@@ -495,9 +496,8 @@ while True:
             elif estado == "felicitaciones":
                 if btn_continue.collidepoint(event.pos):
                     reproducir_sonido(SND_MENU)
-                    estado = "ready"
+                    reiniciar_partida()
 
-        # Teclas
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and estado == "ready":
                 reproducir_sonido(SND_MENU)
@@ -508,7 +508,6 @@ while True:
                 reset_ball()
                 estado = "ready"
 
-    # Pantallas de menú
     if estado == "menu":
         dibujar_menu()
         pygame.display.flip()
@@ -534,7 +533,6 @@ while True:
         pygame.display.flip()
         continue
 
-    # Movimiento paleta - TJ-19
     keys = pygame.key.get_pressed()
 
     if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -545,12 +543,10 @@ while True:
 
     pad_x = max(PAD_W // 2, min(W - PAD_W // 2, pad_x))
 
-    # Estado READY
     if estado == "ready":
         ball_x = float(pad_x)
         ball_y = float(PAD_Y - BALL_R - 2)
 
-    # Estado PLAYING
     if estado == "playing":
         prev_ball_x = ball_x
         prev_ball_y = ball_y
@@ -558,7 +554,6 @@ while True:
         ball_x += ball_dx
         ball_y += ball_dy
 
-        # Perimetro de colision en paredes - TJ-22
         if ball_x - BALL_R <= 0:
             ball_x = BALL_R
             ball_dx = abs(ball_dx)
@@ -571,7 +566,6 @@ while True:
             ball_y = BALL_R
             ball_dy = abs(ball_dy)
 
-        # Rebote con control en plataforma - TJ-21
         if (
             PAD_Y <= ball_y + BALL_R <= PAD_Y + PAD_H
             and pad_x - PAD_W // 2 <= ball_x <= pad_x + PAD_W // 2
@@ -583,7 +577,6 @@ while True:
             ball_dy = -abs(ball_dy)
             ball_y = PAD_Y - BALL_R - 1
 
-        # Sistema de colisiones avanzado - TJ-24
         ball_rect = pygame.Rect(
             int(ball_x - BALL_R),
             int(ball_y - BALL_R),
@@ -619,7 +612,11 @@ while True:
 
                 break
 
-        # Si cae la pelota
+        # TJ-35: si todos los ladrillos fueron destruidos, se completa el nivel
+        if nivel_completado():
+            reproducir_sonido(SND_WIN)
+            estado = "felicitaciones"
+
         if ball_y - BALL_R > H:
             vidas -= 1
 
@@ -630,7 +627,6 @@ while True:
                 reproducir_sonido(SND_VIDA)
                 estado = "life_lost"
 
-    # Dibujo del juego
     draw_pattern_background()
 
     for ladrillo in ladrillos:
