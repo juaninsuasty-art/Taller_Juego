@@ -77,7 +77,7 @@ ball_dy = -4.0
 estado = "menu"   # menu | controles | configuracion | ready | playing | life_lost | game_over
 
 # =========================
-# Estado de partida - TJ-27 y TJ-28
+# Estado de partida
 # =========================
 vidas = 3
 score = 0
@@ -95,7 +95,7 @@ btn_exit_sub = pygame.Rect(W // 2 - 80, 388, 160, 36)
 btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
 
 # =========================
-# Ladrillos
+# Ladrillos - TJ-33 Nivel estatico
 # =========================
 BRICK_COLS = 13
 BRICK_ROWS = 6
@@ -109,8 +109,12 @@ BRICK_OFF_Y = 55
 # =========================
 # Funciones base
 # =========================
-def crear_ladrillos():
-    ladrillos = []
+def crear_nivel_1():
+    """
+    TJ-33:
+    Crea un unico nivel estatico con una distribucion fija de ladrillos.
+    """
+    ladrillos_nivel = []
 
     for fila in range(BRICK_ROWS):
         for columna in range(BRICK_COLS):
@@ -121,14 +125,14 @@ def crear_ladrillos():
                 BRICK_H
             )
 
-            ladrillos.append({
+            ladrillos_nivel.append({
                 "rect": rect,
                 "color": BRICK_COLORS[fila],
                 "activo": True,
                 "puntos": (BRICK_ROWS - fila) * 10
             })
 
-    return ladrillos
+    return ladrillos_nivel
 
 
 def reset_ball():
@@ -146,7 +150,7 @@ def reiniciar_partida():
     vidas = 3
     score = 0
     nivel = 1
-    ladrillos = crear_ladrillos()
+    ladrillos = crear_nivel_1()
     reset_ball()
     estado = "ready"
 
@@ -319,14 +323,12 @@ def dibujar_game_over():
     dibujar_boton(btn_back_menu, "VOLVER AL MENU")
 
 
-# TJ-27 Corazones de vida
 def dibujar_vidas():
     corazones = "♥ " * vidas
     texto = font_med.render(corazones, True, HEART_COL)
     screen.blit(texto, (18, 14))
 
 
-# TJ-28 Contador de puntos y nivel
 def dibujar_hud():
     hud = font_small.render(
         f"PUNTOS: {score}     NIVEL: {nivel}",
@@ -336,7 +338,6 @@ def dibujar_hud():
     screen.blit(hud, (W - hud.get_width() - 18, 16))
 
 
-# TJ-27 Aviso leve al perder una vida
 def dibujar_aviso_vida_perdida():
     caja = pygame.Rect(W // 2 - 150, H // 2 - 45, 300, 90)
 
@@ -356,9 +357,9 @@ def dibujar_mensaje_ready():
 
 
 # =========================
-# Inicialización
+# Inicialización - TJ-33
 # =========================
-ladrillos = crear_ladrillos()
+ladrillos = crear_nivel_1()
 
 # =========================
 # Bucle principal
