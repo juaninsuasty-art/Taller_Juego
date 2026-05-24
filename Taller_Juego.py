@@ -106,18 +106,13 @@ BRICK_OFF_X = (W - BRICK_COLS * (BRICK_W + BRICK_GAP) + BRICK_GAP) // 2
 BRICK_OFF_Y = 55
 
 
-# =========================
-# Funciones base
-# =========================
 def crear_nivel_1():
     """
     TJ-33:
-    Crea un unico nivel estatico con una distribucion fija de ladrillos.
+    Crea un unico nivel estatico.
 
     TJ-34:
-    Agrega diferente durabilidad a los ladrillos.
-    Las dos primeras filas requieren 2 golpes.
-    Las demas filas requieren 1 golpe.
+    Las dos primeras filas tienen mayor durabilidad.
     """
     ladrillos_nivel = []
 
@@ -149,11 +144,6 @@ def crear_nivel_1():
 
 
 def oscurecer_color(color):
-    """
-    TJ-34:
-    Cuando un ladrillo resistente recibe un golpe pero no se destruye,
-    se oscurece un poco para mostrar que fue dañado.
-    """
     return (
         max(0, color[0] - 45),
         max(0, color[1] - 45),
@@ -268,9 +258,6 @@ def dibujar_panel(x, y, w, h):
     return rect
 
 
-# =========================
-# Pantallas de interfaz
-# =========================
 def dibujar_menu():
     draw_pattern_background()
     dibujar_panel(75, 45, 370, 390)
@@ -398,9 +385,7 @@ while True:
             pygame.quit()
             sys.exit()
 
-        # =========================
         # Navegación de menús
-        # =========================
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if estado == "menu":
                 if btn_start.collidepoint(event.pos):
@@ -428,9 +413,7 @@ while True:
                 if btn_back_menu.collidepoint(event.pos):
                     estado = "menu"
 
-        # =========================
         # Teclas
-        # =========================
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and estado == "ready":
                 estado = "playing"
@@ -439,9 +422,7 @@ while True:
                 reset_ball()
                 estado = "ready"
 
-    # =========================
     # Pantallas de menú
-    # =========================
     if estado == "menu":
         dibujar_menu()
         pygame.display.flip()
@@ -462,9 +443,7 @@ while True:
         pygame.display.flip()
         continue
 
-    # =========================
     # Movimiento paleta - TJ-19
-    # =========================
     keys = pygame.key.get_pressed()
 
     if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -475,17 +454,17 @@ while True:
 
     pad_x = max(PAD_W // 2, min(W - PAD_W // 2, pad_x))
 
-    # =========================
     # Estado READY
-    # =========================
     if estado == "ready":
         ball_x = float(pad_x)
         ball_y = float(PAD_Y - BALL_R - 2)
 
-    # =========================
     # Estado PLAYING
-    # =========================
     if estado == "playing":
+        # TJ-24: guardar posición anterior de la pelota
+        prev_ball_x = ball_x
+        prev_ball_y = ball_y
+
         ball_x += ball_dx
         ball_y += ball_dy
 
@@ -513,12 +492,19 @@ while True:
             ball_dy = -abs(ball_dy)
             ball_y = PAD_Y - BALL_R - 1
 
-        # Deteccion de colision pelota-ladrillo - TJ-23 y TJ-34
+        # Sistema de colisiones avanzado - TJ-24
+        ball_rect = pygame.Rect(
+            int(ball_x - BALL_R),
+            int(ball_y - BALL_R),
+            BALL_R * 2,
+            BALL_R * 2
+        )
+
         for ladrillo in ladrillos:
             if not ladrillo["activo"]:
                 continue
 
-            if ladrillo["rect"].collidepoint(ball_x, ball_y):
+            if ball_rect.colliderect(ladrillo["rect"]):
                 ladrillo["vida"] -= 1
 
                 if ladrillo["vida"] <= 0:
@@ -527,7 +513,17 @@ while True:
                 else:
                     ladrillo["color"] = oscurecer_color(ladrillo["color"])
 
-                ball_dy = -ball_dy
+                ball_x = prev_ball_x
+                ball_y = prev_ball_y
+
+                if (
+                    prev_ball_y + BALL_R <= ladrillo["rect"].top
+                    or prev_ball_y - BALL_R >= ladrillo["rect"].bottom
+                ):
+                    ball_dy = -ball_dy
+                else:
+                    ball_dx = -ball_dx
+
                 break
 
         # TJ-27: si cae la pelota, se resta una vida y se muestra aviso leve
@@ -539,9 +535,7 @@ while True:
             else:
                 estado = "life_lost"
 
-    # =========================
     # Dibujo del juego
-    # =========================
     draw_pattern_background()
 
     for ladrillo in ladrillos:
@@ -553,7 +547,6 @@ while True:
                 border_radius=2
             )
 
-            # TJ-34: borde para identificar ladrillos resistentes
             if ladrillo["vida_max"] > 1:
                 pygame.draw.rect(
                     screen,
@@ -577,7 +570,6 @@ while True:
         BALL_R
     )
 
-    # HUD - TJ-28
     dibujar_vidas()
     dibujar_hud()
 
