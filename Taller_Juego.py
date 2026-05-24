@@ -49,12 +49,14 @@ if SOUND_ENABLED:
     SND_LADRILLO = crear_sonido(420, 0.09, 0.35)
     SND_VIDA = crear_sonido(180, 0.20, 0.35)
     SND_GAME_OVER = crear_sonido(120, 0.35, 0.35)
+    SND_WIN = crear_sonido(880, 0.25, 0.30)
 else:
     SND_MENU = None
     SND_PALETA = None
     SND_LADRILLO = None
     SND_VIDA = None
     SND_GAME_OVER = None
+    SND_WIN = None
 
 
 W, H = 520, 480
@@ -90,6 +92,7 @@ TITLE_OUTLINE = (20, 90, 130)
 
 HEART_COL = (255, 90, 120)
 WARNING_COL = (255, 210, 120)
+WIN_COL = (120, 255, 220)
 
 BRICK_COLORS = [
     (90, 220, 220),
@@ -129,6 +132,7 @@ ball_dy = -4.0
 # Estado del juego
 # =========================
 estado = "menu"
+# menu | controles | configuracion | ready | playing | life_lost | game_over | felicitaciones
 
 # =========================
 # Estado de partida
@@ -147,6 +151,7 @@ btn_quit = pygame.Rect(W // 2 - 95, 376, 190, 40)
 
 btn_exit_sub = pygame.Rect(W // 2 - 80, 388, 160, 36)
 btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
+btn_continue = pygame.Rect(W // 2 - 105, 330, 210, 40)
 
 # =========================
 # Ladrillos
@@ -367,20 +372,40 @@ def dibujar_configuracion():
     dibujar_boton(btn_exit_sub, "EXIT")
 
 
+# TJ-32 Pantalla Game Over
 def dibujar_game_over():
     draw_pattern_background()
     dibujar_panel(70, 70, 380, 330)
 
-    titulo = font_title.render("GAME OVER", True, TITLE_MAIN)
-    screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 120))
+    titulo = font_title.render("GAME OVER", True, WARNING_COL)
+    screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 115))
 
     texto = font_med.render(f"Puntuacion final: {score}", True, TEXT_COL)
-    screen.blit(texto, (W // 2 - texto.get_width() // 2, 190))
+    screen.blit(texto, (W // 2 - texto.get_width() // 2, 185))
 
-    ayuda = font_small.render("Puedes volver al menu principal.", True, SUBTEXT_COL)
-    screen.blit(ayuda, (W // 2 - ayuda.get_width() // 2, 225))
+    ayuda = font_small.render("La partida ha terminado.", True, SUBTEXT_COL)
+    screen.blit(ayuda, (W // 2 - ayuda.get_width() // 2, 220))
 
     dibujar_boton(btn_back_menu, "VOLVER AL MENU")
+
+
+# TJ-32 Pantalla Felicitaciones
+def dibujar_felicitaciones():
+    draw_pattern_background()
+    dibujar_panel(60, 60, 400, 340)
+
+    titulo = font_title.render("FELICITACIONES", True, WIN_COL)
+    screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 105))
+
+    texto1 = font_med.render("Completaste el nivel", True, TEXT_COL)
+    texto2 = font_med.render(f"Puntuacion: {score}", True, TEXT_COL)
+    texto3 = font_small.render("Puedes continuar con el siguiente nivel.", True, SUBTEXT_COL)
+
+    screen.blit(texto1, (W // 2 - texto1.get_width() // 2, 180))
+    screen.blit(texto2, (W // 2 - texto2.get_width() // 2, 210))
+    screen.blit(texto3, (W // 2 - texto3.get_width() // 2, 245))
+
+    dibujar_boton(btn_continue, "CONTINUAR")
 
 
 def dibujar_vidas():
@@ -467,6 +492,11 @@ while True:
                     reproducir_sonido(SND_MENU)
                     estado = "menu"
 
+            elif estado == "felicitaciones":
+                if btn_continue.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
+                    estado = "ready"
+
         # Teclas
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and estado == "ready":
@@ -496,6 +526,11 @@ while True:
 
     if estado == "game_over":
         dibujar_game_over()
+        pygame.display.flip()
+        continue
+
+    if estado == "felicitaciones":
+        dibujar_felicitaciones()
         pygame.display.flip()
         continue
 
