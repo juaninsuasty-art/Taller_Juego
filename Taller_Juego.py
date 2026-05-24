@@ -95,6 +95,7 @@ WIN_COL = (120, 255, 220)
 
 POWER_WIDE_COL = (120, 255, 180)
 POWER_BIG_COL = (255, 220, 120)
+POWER_MULTI_COL = (190, 140, 255)
 
 BRICK_COLORS = [
     (90, 220, 220),
@@ -125,15 +126,12 @@ PAD_Y = H - 40
 pad_x = W // 2
 
 # =========================
-# Pelota
+# Pelotas
 # =========================
 BALL_R_NORMAL = 7
 BALL_R_BIG = 11
 BALL_R = BALL_R_NORMAL
-ball_x = float(W // 2)
-ball_y = float(PAD_Y - BALL_R - 2)
-ball_dx = 4.0
-ball_dy = -4.0
+pelotas = []
 
 # =========================
 # Power-ups - TJ-37
@@ -142,7 +140,7 @@ powerups = []
 powerup_speed = 2.2
 powerup_timer = 0
 active_powerup = None
-POWERUP_DURATION = 600  # frames aproximados a 60 FPS = 10 segundos
+POWERUP_DURATION = 600
 
 # =========================
 # Estado del juego
@@ -220,20 +218,32 @@ def crear_nivel(nivel_actual):
     return ladrillos_nivel
 
 
-def crear_nivel_1():
-    return crear_nivel(1)
-
-
-def oscurecer_color(color):
-    return (
-        max(0, color[0] - 45),
-        max(0, color[1] - 45),
-        max(0, color[2] - 45)
-    )
-
-
 def velocidad_por_nivel():
     return 4.0 + (nivel - 1) * 0.4
+
+
+def crear_pelota(x, y, dx, dy):
+    return {
+        "x": float(x),
+        "y": float(y),
+        "dx": float(dx),
+        "dy": float(dy)
+    }
+
+
+def reset_pelotas():
+    global pelotas
+
+    velocidad = velocidad_por_nivel()
+
+    pelotas = [
+        crear_pelota(
+            pad_x,
+            PAD_Y - BALL_R - 2,
+            velocidad,
+            -velocidad
+        )
+    ]
 
 
 def reset_powerups():
@@ -246,15 +256,12 @@ def reset_powerups():
     BALL_R = BALL_R_NORMAL
 
 
-def reset_ball():
-    global ball_x, ball_y, ball_dx, ball_dy
-
-    velocidad = velocidad_por_nivel()
-
-    ball_x = float(pad_x)
-    ball_y = float(PAD_Y - BALL_R - 2)
-    ball_dx = velocidad
-    ball_dy = -velocidad
+def oscurecer_color(color):
+    return (
+        max(0, color[0] - 45),
+        max(0, color[1] - 45),
+        max(0, color[2] - 45)
+    )
 
 
 def reiniciar_partida():
@@ -265,7 +272,7 @@ def reiniciar_partida():
     nivel = 1
     reset_powerups()
     ladrillos = crear_nivel(nivel)
-    reset_ball()
+    reset_pelotas()
     estado = "ready"
 
 
@@ -275,7 +282,7 @@ def pasar_siguiente_nivel():
     nivel += 1
     reset_powerups()
     ladrillos = crear_nivel(nivel)
-    reset_ball()
+    reset_pelotas()
     estado = "ready"
 
 
@@ -290,14 +297,16 @@ def nivel_completado():
 # Power-ups - TJ-37
 # =========================
 def crear_powerup(x, y):
-    tipo = random.choice(["WIDE", "BIG"])
+    tipo = random.choice(["WIDE", "BIG", "MULTI"])
 
-    rect = pygame.Rect(int(x) - 14, int(y) - 8, 28, 16)
+    rect = pygame.Rect(int(x) - 17, int(y) - 8, 34, 16)
 
     if tipo == "WIDE":
         color = POWER_WIDE_COL
-    else:
+    elif tipo == "BIG":
         color = POWER_BIG_COL
+    else:
+        color = POWER_MULTI_COL
 
     powerups.append({
         "rect": rect,
@@ -307,19 +316,49 @@ def crear_powerup(x, y):
 
 
 def intentar_lanzar_powerup(x, y):
-    """
-    TJ-37:
-    No todos los ladrillos sueltan mejora.
-    Se usa una probabilidad pequeña para que no aparezcan demasiadas.
-    """
     if random.random() < 0.25:
         crear_powerup(x, y)
+
+
+def agregar_multiples_pelotas():
+    """
+    TJ-37:
+    Power-up MULTI. Crea dos pelotas adicionales a partir
+    de la primera pelota disponible.
+    """
+    if len(pelotas) == 0:
+        return
+
+    base = pelotas[0]
+    velocidad = velocidad_por_nivel()
+
+    pelotas.append(
+        crear_pelota(
+            base["x"],
+            base["y"],
+            -velocidad,
+            -abs(velocidad)
+        )
+    )
+
+    pelotas.append(
+        crear_pelota(
+            base["x"],
+            base["y"],
+            velocidad * 0.6,
+            -abs(velocidad)
+        )
+    )
 
 
 def aplicar_powerup(tipo):
     global PAD_W, BALL_R, active_powerup, powerup_timer
 
     reproducir_sonido(SND_POWER)
+
+    if tipo == "MULTI":
+        agregar_multiples_pelotas()
+        return
 
     active_powerup = tipo
     powerup_timer = POWERUP_DURATION
@@ -336,7 +375,6 @@ def aplicar_powerup(tipo):
 def actualizar_powerups():
     global powerup_timer, active_powerup, PAD_W, BALL_R
 
-    # Mover power-ups que caen
     for powerup in powerups[:]:
         powerup["rect"].y += powerup_speed
 
@@ -354,7 +392,6 @@ def actualizar_powerups():
         elif powerup["rect"].top > H:
             powerups.remove(powerup)
 
-    # Controlar duración de power-up activo
     if active_powerup is not None:
         powerup_timer -= 1
 
@@ -601,6 +638,10 @@ def dibujar_hud():
         texto = font_small.render(f"POWER: {active_powerup}", True, CYAN_BRIGHT)
         screen.blit(texto, (W // 2 - texto.get_width() // 2, 16))
 
+    if len(pelotas) > 1:
+        multi = font_small.render(f"PELOTAS: {len(pelotas)}", True, POWER_MULTI_COL)
+        screen.blit(multi, (W // 2 - multi.get_width() // 2, 34))
+
 
 def dibujar_aviso_vida_perdida():
     caja = pygame.Rect(W // 2 - 150, H // 2 - 45, 300, 90)
@@ -624,6 +665,7 @@ def dibujar_mensaje_ready():
 # Inicialización
 # =========================
 ladrillos = crear_nivel(nivel)
+reset_pelotas()
 
 # =========================
 # Bucle principal
@@ -686,7 +728,7 @@ while True:
 
             elif event.key == pygame.K_RETURN and estado == "life_lost":
                 reproducir_sonido(SND_MENU)
-                reset_ball()
+                reset_pelotas()
                 estado = "ready"
 
     if estado == "menu":
@@ -725,87 +767,90 @@ while True:
     pad_x = max(PAD_W // 2, min(W - PAD_W // 2, pad_x))
 
     if estado == "ready":
-        ball_x = float(pad_x)
-        ball_y = float(PAD_Y - BALL_R - 2)
+        pelotas[0]["x"] = float(pad_x)
+        pelotas[0]["y"] = float(PAD_Y - BALL_R - 2)
 
     if estado == "playing":
         actualizar_powerups()
 
-        prev_ball_x = ball_x
-        prev_ball_y = ball_y
+        for pelota in pelotas[:]:
+            prev_ball_x = pelota["x"]
+            prev_ball_y = pelota["y"]
 
-        ball_x += ball_dx
-        ball_y += ball_dy
+            pelota["x"] += pelota["dx"]
+            pelota["y"] += pelota["dy"]
 
-        if ball_x - BALL_R <= 0:
-            ball_x = BALL_R
-            ball_dx = abs(ball_dx)
+            if pelota["x"] - BALL_R <= 0:
+                pelota["x"] = BALL_R
+                pelota["dx"] = abs(pelota["dx"])
 
-        if ball_x + BALL_R >= W:
-            ball_x = W - BALL_R
-            ball_dx = -abs(ball_dx)
+            if pelota["x"] + BALL_R >= W:
+                pelota["x"] = W - BALL_R
+                pelota["dx"] = -abs(pelota["dx"])
 
-        if ball_y - BALL_R <= 0:
-            ball_y = BALL_R
-            ball_dy = abs(ball_dy)
+            if pelota["y"] - BALL_R <= 0:
+                pelota["y"] = BALL_R
+                pelota["dy"] = abs(pelota["dy"])
 
-        if (
-            PAD_Y <= ball_y + BALL_R <= PAD_Y + PAD_H
-            and pad_x - PAD_W // 2 <= ball_x <= pad_x + PAD_W // 2
-            and ball_dy > 0
-        ):
-            reproducir_sonido(SND_PALETA)
-            rel = (ball_x - pad_x) / (PAD_W / 2)
-            ball_dx = rel * 5
-            ball_dy = -abs(ball_dy)
-            ball_y = PAD_Y - BALL_R - 1
+            if (
+                PAD_Y <= pelota["y"] + BALL_R <= PAD_Y + PAD_H
+                and pad_x - PAD_W // 2 <= pelota["x"] <= pad_x + PAD_W // 2
+                and pelota["dy"] > 0
+            ):
+                reproducir_sonido(SND_PALETA)
+                rel = (pelota["x"] - pad_x) / (PAD_W / 2)
+                pelota["dx"] = rel * 5
+                pelota["dy"] = -abs(pelota["dy"])
+                pelota["y"] = PAD_Y - BALL_R - 1
 
-        ball_rect = pygame.Rect(
-            int(ball_x - BALL_R),
-            int(ball_y - BALL_R),
-            BALL_R * 2,
-            BALL_R * 2
-        )
+            ball_rect = pygame.Rect(
+                int(pelota["x"] - BALL_R),
+                int(pelota["y"] - BALL_R),
+                BALL_R * 2,
+                BALL_R * 2
+            )
 
-        for ladrillo in ladrillos:
-            if not ladrillo["activo"]:
-                continue
+            for ladrillo in ladrillos:
+                if not ladrillo["activo"]:
+                    continue
 
-            if ball_rect.colliderect(ladrillo["rect"]):
-                reproducir_sonido(SND_LADRILLO)
+                if ball_rect.colliderect(ladrillo["rect"]):
+                    reproducir_sonido(SND_LADRILLO)
 
-                ladrillo["vida"] -= 1
+                    ladrillo["vida"] -= 1
 
-                if ladrillo["vida"] <= 0:
-                    ladrillo["activo"] = False
-                    score += ladrillo["puntos"]
+                    if ladrillo["vida"] <= 0:
+                        ladrillo["activo"] = False
+                        score += ladrillo["puntos"]
 
-                    # TJ-37: algunos ladrillos destruidos liberan power-up
-                    intentar_lanzar_powerup(
-                        ladrillo["rect"].centerx,
-                        ladrillo["rect"].centery
-                    )
-                else:
-                    ladrillo["color"] = oscurecer_color(ladrillo["color"])
+                        intentar_lanzar_powerup(
+                            ladrillo["rect"].centerx,
+                            ladrillo["rect"].centery
+                        )
+                    else:
+                        ladrillo["color"] = oscurecer_color(ladrillo["color"])
 
-                ball_x = prev_ball_x
-                ball_y = prev_ball_y
+                    pelota["x"] = prev_ball_x
+                    pelota["y"] = prev_ball_y
 
-                if (
-                    prev_ball_y + BALL_R <= ladrillo["rect"].top
-                    or prev_ball_y - BALL_R >= ladrillo["rect"].bottom
-                ):
-                    ball_dy = -ball_dy
-                else:
-                    ball_dx = -ball_dx
+                    if (
+                        prev_ball_y + BALL_R <= ladrillo["rect"].top
+                        or prev_ball_y - BALL_R >= ladrillo["rect"].bottom
+                    ):
+                        pelota["dy"] = -pelota["dy"]
+                    else:
+                        pelota["dx"] = -pelota["dx"]
 
-                break
+                    break
+
+            if pelota["y"] - BALL_R > H:
+                pelotas.remove(pelota)
 
         if nivel_completado():
             reproducir_sonido(SND_WIN)
             estado = "felicitaciones"
 
-        if ball_y - BALL_R > H:
+        if len(pelotas) == 0:
             vidas -= 1
 
             if vidas <= 0:
@@ -844,12 +889,13 @@ while True:
         border_radius=5
     )
 
-    pygame.draw.circle(
-        screen,
-        BALL_COL,
-        (int(ball_x), int(ball_y)),
-        BALL_R
-    )
+    for pelota in pelotas:
+        pygame.draw.circle(
+            screen,
+            BALL_COL,
+            (int(pelota["x"]), int(pelota["y"])),
+            BALL_R
+        )
 
     dibujar_vidas()
     dibujar_hud()
