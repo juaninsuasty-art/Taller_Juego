@@ -147,7 +147,10 @@ btn_quit = pygame.Rect(W // 2 - 95, 376, 190, 40)
 
 btn_exit_sub = pygame.Rect(W // 2 - 80, 388, 160, 36)
 btn_back_menu = pygame.Rect(W // 2 - 105, 330, 210, 40)
-btn_continue = pygame.Rect(W // 2 - 105, 330, 210, 40)
+
+# TJ-36: botones de la pantalla de felicitaciones
+btn_next_level = pygame.Rect(W // 2 - 105, 305, 210, 40)
+btn_win_menu = pygame.Rect(W // 2 - 105, 355, 210, 40)
 
 # =========================
 # Ladrillos
@@ -161,8 +164,23 @@ BRICK_OFF_X = (W - BRICK_COLS * (BRICK_W + BRICK_GAP) + BRICK_GAP) // 2
 BRICK_OFF_Y = 55
 
 
-def crear_nivel_1():
+# =========================
+# Niveles - TJ-33, TJ-34, TJ-36
+# =========================
+def crear_nivel(nivel_actual):
+    """
+    TJ-33:
+    Crea el nivel con una distribucion fija de ladrillos.
+
+    TJ-34:
+    Los ladrillos tienen diferente durabilidad.
+
+    TJ-36:
+    En niveles superiores aumenta la cantidad de ladrillos resistentes.
+    """
     ladrillos_nivel = []
+
+    filas_resistentes = min(BRICK_ROWS, 1 + nivel_actual)
 
     for fila in range(BRICK_ROWS):
         for columna in range(BRICK_COLS):
@@ -173,10 +191,13 @@ def crear_nivel_1():
                 BRICK_H
             )
 
-            if fila < 2:
+            if fila < filas_resistentes:
                 vida_ladrillo = 2
             else:
                 vida_ladrillo = 1
+
+            if nivel_actual >= 3 and fila == 0:
+                vida_ladrillo = 3
 
             ladrillos_nivel.append({
                 "rect": rect,
@@ -191,6 +212,10 @@ def crear_nivel_1():
     return ladrillos_nivel
 
 
+def crear_nivel_1():
+    return crear_nivel(1)
+
+
 def oscurecer_color(color):
     return (
         max(0, color[0] - 45),
@@ -199,13 +224,23 @@ def oscurecer_color(color):
     )
 
 
+def velocidad_por_nivel():
+    """
+    TJ-36:
+    Aumenta ligeramente la velocidad de la pelota segun el nivel.
+    """
+    return 4.0 + (nivel - 1) * 0.4
+
+
 def reset_ball():
     global ball_x, ball_y, ball_dx, ball_dy
 
+    velocidad = velocidad_por_nivel()
+
     ball_x = float(pad_x)
     ball_y = float(PAD_Y - BALL_R - 2)
-    ball_dx = 4.0
-    ball_dy = -4.0
+    ball_dx = velocidad
+    ball_dy = -velocidad
 
 
 def reiniciar_partida():
@@ -214,12 +249,22 @@ def reiniciar_partida():
     vidas = 3
     score = 0
     nivel = 1
-    ladrillos = crear_nivel_1()
+    ladrillos = crear_nivel(nivel)
     reset_ball()
     estado = "ready"
 
 
-# TJ-35 Revisar si el nivel fue completado
+# TJ-36 pasar al siguiente nivel
+def pasar_siguiente_nivel():
+    global nivel, ladrillos, estado
+
+    nivel += 1
+    ladrillos = crear_nivel(nivel)
+    reset_ball()
+    estado = "ready"
+
+
+# TJ-35 revisar si todos los ladrillos fueron destruidos
 def nivel_completado():
     for ladrillo in ladrillos:
         if ladrillo["activo"]:
@@ -227,6 +272,9 @@ def nivel_completado():
     return True
 
 
+# =========================
+# Dibujo general
+# =========================
 def draw_pattern_background():
     screen.fill(BG)
 
@@ -314,6 +362,9 @@ def dibujar_panel(x, y, w, h):
     return rect
 
 
+# =========================
+# Pantallas de interfaz
+# =========================
 def dibujar_menu():
     draw_pattern_background()
     dibujar_panel(75, 45, 370, 390)
@@ -394,20 +445,21 @@ def dibujar_game_over():
 
 def dibujar_felicitaciones():
     draw_pattern_background()
-    dibujar_panel(60, 60, 400, 340)
+    dibujar_panel(60, 50, 400, 380)
 
     titulo = font_title.render("FELICITACIONES", True, WIN_COL)
-    screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 105))
+    screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 90))
 
-    texto1 = font_med.render("Completaste el nivel", True, TEXT_COL)
+    texto1 = font_med.render(f"Completaste el nivel {nivel}", True, TEXT_COL)
     texto2 = font_med.render(f"Puntuacion: {score}", True, TEXT_COL)
-    texto3 = font_small.render("Presiona continuar para jugar de nuevo.", True, SUBTEXT_COL)
+    texto3 = font_small.render("Puedes continuar o volver al menu.", True, SUBTEXT_COL)
 
-    screen.blit(texto1, (W // 2 - texto1.get_width() // 2, 180))
-    screen.blit(texto2, (W // 2 - texto2.get_width() // 2, 210))
-    screen.blit(texto3, (W // 2 - texto3.get_width() // 2, 245))
+    screen.blit(texto1, (W // 2 - texto1.get_width() // 2, 165))
+    screen.blit(texto2, (W // 2 - texto2.get_width() // 2, 195))
+    screen.blit(texto3, (W // 2 - texto3.get_width() // 2, 230))
 
-    dibujar_boton(btn_continue, "CONTINUAR")
+    dibujar_boton(btn_next_level, "CONTINUAR")
+    dibujar_boton(btn_win_menu, "MENU")
 
 
 def dibujar_vidas():
@@ -446,7 +498,7 @@ def dibujar_mensaje_ready():
 # =========================
 # Inicialización
 # =========================
-ladrillos = crear_nivel_1()
+ladrillos = crear_nivel(nivel)
 
 # =========================
 # Bucle principal
@@ -494,9 +546,13 @@ while True:
                     estado = "menu"
 
             elif estado == "felicitaciones":
-                if btn_continue.collidepoint(event.pos):
+                if btn_next_level.collidepoint(event.pos):
                     reproducir_sonido(SND_MENU)
-                    reiniciar_partida()
+                    pasar_siguiente_nivel()
+
+                elif btn_win_menu.collidepoint(event.pos):
+                    reproducir_sonido(SND_MENU)
+                    estado = "menu"
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and estado == "ready":
@@ -612,7 +668,6 @@ while True:
 
                 break
 
-        # TJ-35: si todos los ladrillos fueron destruidos, se completa el nivel
         if nivel_completado():
             reproducir_sonido(SND_WIN)
             estado = "felicitaciones"
