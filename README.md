@@ -20,7 +20,7 @@ El jugador pierde una vida cuando todas las pelotas caen por debajo de la pantal
 
 ## 3. Tecnologías utilizadas
 
-- Python
+- Python 3.14
 - pygame-ce
 - Visual Studio Code
 - Git
