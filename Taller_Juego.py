@@ -13,6 +13,15 @@ BG = (10, 10, 20)
 PAD_COL = (180, 180, 255)
 BALL_COL = (255, 255, 255)
 
+BRICK_COLORS = [
+    (90, 220, 220),
+    (80, 180, 230),
+    (100, 140, 230),
+    (150, 120, 230),
+    (170, 110, 200),
+    (60, 130, 150),
+]
+
 # Paleta
 PAD_W, PAD_H = 80, 10
 PAD_Y = H - 40
@@ -25,6 +34,37 @@ ball_y = float(PAD_Y - BALL_R - 2)
 ball_dx = 4.0
 ball_dy = -4.0
 
+# Ladrillos
+BRICK_COLS = 13
+BRICK_ROWS = 6
+BRICK_W = 36
+BRICK_H = 14
+BRICK_GAP = 2
+BRICK_OFF_X = (W - BRICK_COLS * (BRICK_W + BRICK_GAP) + BRICK_GAP) // 2
+BRICK_OFF_Y = 55
+
+
+# TJ-23 crear ladrillos
+def crear_ladrillos():
+    ladrillos = []
+
+    for fila in range(BRICK_ROWS):
+        for columna in range(BRICK_COLS):
+            rect = pygame.Rect(
+                BRICK_OFF_X + columna * (BRICK_W + BRICK_GAP),
+                BRICK_OFF_Y + fila * (BRICK_H + BRICK_GAP),
+                BRICK_W,
+                BRICK_H
+            )
+
+            ladrillos.append({
+                "rect": rect,
+                "color": BRICK_COLORS[fila],
+                "activo": True
+            })
+
+    return ladrillos
+
 
 def reset_ball():
     global ball_x, ball_y, ball_dx, ball_dy
@@ -34,6 +74,8 @@ def reset_ball():
     ball_dx = 4.0
     ball_dy = -4.0
 
+
+ladrillos = crear_ladrillos()
 
 while True:
     clock.tick(60)
@@ -60,18 +102,14 @@ while True:
     ball_y += ball_dy
 
     # Perimetro de colision en paredes - TJ-22
-
-    # Pared izquierda
     if ball_x - BALL_R <= 0:
         ball_x = BALL_R
         ball_dx = abs(ball_dx)
 
-    # Pared derecha
     if ball_x + BALL_R >= W:
         ball_x = W - BALL_R
         ball_dx = -abs(ball_dx)
 
-    # Techo
     if ball_y - BALL_R <= 0:
         ball_y = BALL_R
         ball_dy = abs(ball_dy)
@@ -87,6 +125,16 @@ while True:
         ball_dy = -abs(ball_dy)
         ball_y = PAD_Y - BALL_R - 1
 
+    # Deteccion de colision pelota-ladrillo - TJ-23
+    for ladrillo in ladrillos:
+        if not ladrillo["activo"]:
+            continue
+
+        if ladrillo["rect"].collidepoint(ball_x, ball_y):
+            ladrillo["activo"] = False
+            ball_dy = -ball_dy
+            break
+
     # Limite inferior: si la pelota cae, se reinicia
     if ball_y - BALL_R > H:
         reset_ball()
@@ -94,12 +142,24 @@ while True:
     # Dibujo
     screen.fill(BG)
 
+    # Dibujar ladrillos
+    for ladrillo in ladrillos:
+        if ladrillo["activo"]:
+            pygame.draw.rect(
+                screen,
+                ladrillo["color"],
+                ladrillo["rect"],
+                border_radius=2
+            )
+
+    # Dibujar paleta
     pygame.draw.rect(
         screen,
         PAD_COL,
         (pad_x - PAD_W // 2, PAD_Y, PAD_W, PAD_H)
     )
 
+    # Dibujar pelota
     pygame.draw.circle(
         screen,
         BALL_COL,
