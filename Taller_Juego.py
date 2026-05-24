@@ -76,8 +76,12 @@ ball_dy = -4.0
 # =========================
 estado = "menu"   # menu | controles | configuracion | ready | playing | life_lost | game_over
 
-# Vidas
+# =========================
+# Estado de partida - TJ-27 y TJ-28
+# =========================
 vidas = 3
+score = 0
+nivel = 1
 
 # =========================
 # Botones
@@ -120,7 +124,8 @@ def crear_ladrillos():
             ladrillos.append({
                 "rect": rect,
                 "color": BRICK_COLORS[fila],
-                "activo": True
+                "activo": True,
+                "puntos": (BRICK_ROWS - fila) * 10
             })
 
     return ladrillos
@@ -136,9 +141,11 @@ def reset_ball():
 
 
 def reiniciar_partida():
-    global vidas, ladrillos, estado
+    global vidas, score, nivel, ladrillos, estado
 
     vidas = 3
+    score = 0
+    nivel = 1
     ladrillos = crear_ladrillos()
     reset_ball()
     estado = "ready"
@@ -303,7 +310,7 @@ def dibujar_game_over():
     titulo = font_title.render("GAME OVER", True, TITLE_MAIN)
     screen.blit(titulo, (W // 2 - titulo.get_width() // 2, 120))
 
-    texto = font_med.render("Te quedaste sin vidas", True, TEXT_COL)
+    texto = font_med.render(f"Puntuacion final: {score}", True, TEXT_COL)
     screen.blit(texto, (W // 2 - texto.get_width() // 2, 190))
 
     ayuda = font_small.render("Puedes volver al menu principal.", True, SUBTEXT_COL)
@@ -317,6 +324,16 @@ def dibujar_vidas():
     corazones = "♥ " * vidas
     texto = font_med.render(corazones, True, HEART_COL)
     screen.blit(texto, (18, 14))
+
+
+# TJ-28 Contador de puntos y nivel
+def dibujar_hud():
+    hud = font_small.render(
+        f"PUNTOS: {score}     NIVEL: {nivel}",
+        True,
+        TEXT_COL
+    )
+    screen.blit(hud, (W - hud.get_width() - 18, 16))
 
 
 # TJ-27 Aviso leve al perder una vida
@@ -476,6 +493,7 @@ while True:
 
             if ladrillo["rect"].collidepoint(ball_x, ball_y):
                 ladrillo["activo"] = False
+                score += ladrillo["puntos"]
                 ball_dy = -ball_dy
                 break
 
@@ -516,8 +534,9 @@ while True:
         BALL_R
     )
 
-    # Corazones de vida - TJ-27
+    # HUD - TJ-28
     dibujar_vidas()
+    dibujar_hud()
 
     if estado == "ready":
         dibujar_mensaje_ready()
